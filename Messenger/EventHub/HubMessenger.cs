@@ -4,40 +4,41 @@ using Azure.Messaging.EventHubs.Producer;
 using Azure.Storage.Blobs;
 using Common.Lang.Extensions;
 using Nito.AsyncEx.Synchronous;
+using System.Collections.Immutable;
 
 namespace Common.Messenger.EventHub;
 
 public sealed class HubMessenger : IMessenger
 {
-    private string BlobConnectionString { get; init; }
-    private string BlobContainerName { get; init; }
-
-    private string ConnectionString { get; init; }
-    public string[] Topics { get; init; }
-    private IDictionary<string, string> Properties { get; init; }
+    public static HubMessenger Build(string blobConnectionString, string blobContainerName, string connectionString, string[] topics, IDictionary<string, string>? properties = null)
+    {
+        var producers = topics.Select(x => new EventHubProducerClient(connectionString, x.ToLower())).ToDictionary(x => x.EventHubName.ToLower());
+        var blobClient = new BlobContainerClient(blobConnectionString, blobContainerName);
+        var processors = topics.Select(x => new EventProcessorClient(
+            blobClient,
+            properties?.GetOrDefault(EventHubConsumerProps.GroupId) ?? EventHubConsumerClient.DefaultConsumerGroupName,
+            connectionString,
+            x
+        )).ToDictionary(x => x.EventHubName.ToLower());
+        return new HubMessenger(producers, processors, topics, properties);
+    }
 
     private readonly IReadOnlyDictionary<string, EventHubProducerClient> _producers;
+    private readonly IReadOnlyDictionary<string, EventProcessorClient> _consumers;
+    public string[] Topics { get; init; }
+    private readonly IDictionary<string, string> _properties;
 
-    public HubMessenger(string blobConnectionString, string blobContainerName, string connectionString, string[] topics, IEnumerable<KeyValuePair<string, string>> properties)
+    public HubMessenger(IReadOnlyDictionary<string, EventHubProducerClient> producers, IReadOnlyDictionary<string, EventProcessorClient> consumers, string[] topics, IDictionary<string, string>? properties = null)
     {
-        BlobConnectionString = blobConnectionString;
-        BlobContainerName = blobContainerName;
-        ConnectionString = connectionString;
+        _producers = producers;
+        _consumers = consumers;
         Topics = topics;
-        Properties = new Dictionary<string, string>(properties);
-        _producers = Topics.Select(x => new EventHubProducerClient(ConnectionString, x.ToLower())).ToDictionary(x => x.EventHubName);
+        _properties = properties ?? ImmutableDictionary<string, string>.Empty;
     }
 
     public IConsumer Consume(string topic, IDictionary<string, string>? properties = null)
     {
-        var blobClient = new BlobContainerClient(BlobConnectionString, BlobContainerName);
-        var processor = new EventProcessorClient(
-            blobClient,
-            properties?.GetOrDefault(EventHubConsumerProps.GroupId) ?? EventHubConsumerClient.DefaultConsumerGroupName,
-            ConnectionString,
-            topic
-        );
-        return new EventHubConsumer(processor, this.Properties.Merge(properties));
+        return new EventHubConsumer(_consumers[topic.ToLower()], _properties.Merge(properties));
     }
 
     public IProducer Produce(string topic, IDictionary<string, string>? properties = null)

@@ -3,7 +3,6 @@ using Azure.Messaging.EventHubs.Producer;
 using Common.Lang.Extensions;
 using Common.Telemetry;
 using Common.Telemetry.OpenTelemetry;
-using Nito.AsyncEx.Synchronous;
 using OpenTelemetry.Trace;
 using Serilog;
 

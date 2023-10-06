@@ -19,7 +19,7 @@ namespace App.Consumer.Controllers
         public async Task Consume(string group, [FromQuery] string[] topics, CancellationToken token = default)
         {
             //  https://itnext.io/server-side-event-streams-with-dotnet-core-and-typescript-d20c84017480
-            await using var messenger = new HubMessenger(
+            await using var messenger = HubMessenger.Build(
                 Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
                 "eventhub-topic-offsets",
                 Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
@@ -47,7 +47,7 @@ namespace App.Consumer.Controllers
         [Route("events/{group}/{topic}")]
         public async Task<IActionResult> Produce(string group, string topic, [FromBody] string payload, CancellationToken token = default)
         {
-            await using var messenger = new HubMessenger(
+            await using var messenger = HubMessenger.Build(
                 Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
                 "eventhub-topic-offsets",
                 Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
@@ -71,7 +71,7 @@ namespace App.Consumer.Controllers
         [Route("events/{group}/{topic}")]
         public async Task Ping(string group, string topic, [FromQuery] int delay = 2000, CancellationToken token = default)
         {
-            await using var messenger = new HubMessenger(
+            await using var messenger = HubMessenger.Build(
                 Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
                 "eventhub-topic-offsets",
                 Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",

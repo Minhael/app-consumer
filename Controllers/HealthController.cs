@@ -35,4 +35,12 @@ public class HealthController : ControllerBase
                Log.IsEnabled(LogEventLevel.Error) ? "error" :
                Log.IsEnabled(LogEventLevel.Fatal) ? "fatal" : "none";
     }
+
+    [HttpPost]
+    [Route("health/gc")]
+    public IActionResult Gc()
+    {
+        GC.Collect();
+        return NoContent();
+    }
 }

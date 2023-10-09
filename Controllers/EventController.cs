@@ -19,12 +19,15 @@ namespace App.Consumer.Controllers
         public async Task Consume(string group, [FromQuery] string[] topics, CancellationToken token = default)
         {
             //  https://itnext.io/server-side-event-streams-with-dotnet-core-and-typescript-d20c84017480
-            await using var messenger = HubMessenger.Build(
-                Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
-                "eventhub-topic-offsets",
-                Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
-                topics,
-                new Dictionary<string, string> { { "groupID", group } }
+            await using var messenger = EventHubs.Build(
+                new EventHubs.Configuration
+                {
+                    BlobConnectionString = Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
+                    BlobContainerName = "eventhub-topic-offsets",
+                    ConnectionString = Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
+                    Topics = topics,
+                    Properties = new Dictionary<string, string> { { "groupID", group } }
+                }
             );
 
             Response.Headers.Add("Cache-Control", "no-cache");
@@ -47,19 +50,22 @@ namespace App.Consumer.Controllers
         [Route("events/{group}/{topic}")]
         public async Task<IActionResult> Produce(string group, string topic, [FromBody] string payload, CancellationToken token = default)
         {
-            await using var messenger = HubMessenger.Build(
-                Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
-                "eventhub-topic-offsets",
-                Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
-                new[] { topic },
-                new Dictionary<string, string> { { "groupID", group } }
+            await using var messenger = EventHubs.Build(
+                new EventHubs.Configuration
+                {
+                    BlobConnectionString = Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
+                    BlobContainerName = "eventhub-topic-offsets",
+                    ConnectionString = Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
+                    Topics = new[] { topic },
+                    Properties = new Dictionary<string, string> { { "groupID", group } }
+                }
             );
 
             var message = new Message
             {
                 Payload = payload,
                 Key = payload.Utf8().Base64(),
-                Timestamp = SystemClock.Instance.GetCurrentInstant(),
+                Utc = SystemClock.Instance.GetCurrentInstant().ToUnixTimeMilliseconds(),
             };
 
             await messenger.Produce(topic).Publish(message, token);
@@ -71,12 +77,15 @@ namespace App.Consumer.Controllers
         [Route("events/{group}/{topic}")]
         public async Task Ping(string group, string topic, [FromQuery] int delay = 2000, CancellationToken token = default)
         {
-            await using var messenger = HubMessenger.Build(
-                Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
-                "eventhub-topic-offsets",
-                Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
-                new[] { topic },
-                new Dictionary<string, string> { { "groupID", group } }
+            await using var messenger = EventHubs.Build(
+                new EventHubs.Configuration
+                {
+                    BlobConnectionString = Environment.GetEnvironmentVariable("AzureStorageConnectionString") ?? "",
+                    BlobContainerName = "eventhub-topic-offsets",
+                    ConnectionString = Environment.GetEnvironmentVariable("EventHubConnectionString") ?? "",
+                    Topics = new[] { topic },
+                    Properties = new Dictionary<string, string> { { "groupID", group } }
+                }
             );
             var producer = messenger.Produce(topic);
 
@@ -96,7 +105,7 @@ namespace App.Consumer.Controllers
                     {
                         Payload = payload,
                         Key = payload.Utf8().Base64(),
-                        Timestamp = SystemClock.Instance.GetCurrentInstant(),
+                        Utc = SystemClock.Instance.GetCurrentInstant().ToUnixTimeMilliseconds(),
                     };
 
                     var init = watch.Elapsed;

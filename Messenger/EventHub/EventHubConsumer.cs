@@ -5,7 +5,6 @@ using Common.Lang.Extensions;
 using Common.Lang.Threading;
 using Common.Telemetry;
 using Common.Telemetry.OpenTelemetry;
-using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Trace;
 using Serilog;
 
@@ -15,7 +14,6 @@ namespace Common.Messenger.EventHub;
 //  https://stackoverflow.com/questions/62214055/iasyncenumerable-yielding-from-event-handler
 sealed class EventHubConsumer : IConsumer
 {
-    private static readonly TextMapPropagator _propagator = Propagators.DefaultTextMapPropagator;
     private static readonly Tracer _tracer = Measure.CreateTracer<EventHubConsumer>();
     private static readonly Serilog.ILogger _logger = Log.ForContext<EventHubConsumer>();
 
@@ -35,7 +33,7 @@ sealed class EventHubConsumer : IConsumer
         return DedicatedTask.Run(async token =>
         {
             _client.PartitionInitializingAsync += ssp.InitHandler;
-            _client.ProcessErrorAsync += ssp.ErrorHandler;
+            _client.ProcessErrorAsync += Subscription.ErrorHandler;
             _client.ProcessEventAsync += ssp.EventHandler;
 
             _logger.Debug("Subscribe to topic {topic}", _client.EventHubName);
@@ -57,7 +55,7 @@ sealed class EventHubConsumer : IConsumer
             {
                 await _client.StopProcessingAsync(CancellationToken.None);
                 _client.ProcessEventAsync -= ssp.EventHandler;
-                _client.ProcessErrorAsync -= ssp.ErrorHandler;
+                _client.ProcessErrorAsync -= Subscription.ErrorHandler;
                 _client.PartitionInitializingAsync -= ssp.InitHandler;
             }
         });
@@ -78,7 +76,7 @@ sealed class EventHubConsumer : IConsumer
 
         public Task InitHandler(PartitionInitializingEventArgs args)
         {
-            args.DefaultStartingPosition = _properties.GetOrDefault(EventHubConsumerProps.AutoOffsetReset)?.ToLower() == "earliest" ? EventPosition.Earliest : EventPosition.Latest;
+            args.DefaultStartingPosition = _properties.GetOrDefault(EventHubs.AutoOffsetReset)?.ToLower() == "earliest" ? EventPosition.Earliest : EventPosition.Latest;
             return Task.CompletedTask;
         }
 
@@ -112,7 +110,7 @@ sealed class EventHubConsumer : IConsumer
             }
         }
 
-        public async Task ErrorHandler(ProcessErrorEventArgs args)
+        public static async Task ErrorHandler(ProcessErrorEventArgs args)
         {
             _logger.Error(args.Exception, "Failed to process message");
             await Task.CompletedTask;

@@ -7,7 +7,8 @@ public record Message
 {
     public string Payload { get; init; } = "";
     public string? Key { get; init; } = null;
-    public Instant Timestamp { get; init; }
+    public Instant Timestamp => Instant.FromUnixTimeMilliseconds(Utc);
+    public long Utc { get; init; }
     public Dictionary<string, object> Properties { get; init; } = new Dictionary<string, object>();
 
     public override string ToString()

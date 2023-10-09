@@ -20,7 +20,7 @@ namespace App.Consumer.Controllers
         [Route("kafka/{group}")]
         public async Task Consume(string group, [FromQuery] string[] topics, CancellationToken token = default)
         {
-            await using var messenger = KafkaMessenger.BuildSaslPlain(
+            await using var messenger = Kafkas.BuildSaslPlain(
                 "cds-web-vms-test-eh-0.servicebus.windows.net:9093",
                 "$Default",
                 "$ConnectionString",
@@ -50,7 +50,7 @@ namespace App.Consumer.Controllers
         public async Task<IActionResult> Produce(string group, string topic, [FromBody] string payload, CancellationToken token = default)
         {
             System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            await using var messenger = KafkaMessenger.BuildSaslPlain(
+            await using var messenger = Kafkas.BuildSaslPlain(
                 "cds-web-vms-test-eh-0.servicebus.windows.net:9093",
                 "$Default",
                 "$ConnectionString",
@@ -63,7 +63,7 @@ namespace App.Consumer.Controllers
             {
                 Payload = payload,
                 Key = payload.Utf8().Base64(),
-                Timestamp = SystemClock.Instance.GetCurrentInstant(),
+                Utc = SystemClock.Instance.GetCurrentInstant().ToUnixTimeMilliseconds(),
             };
 
             await messenger.Produce(topic).Publish(message, token);
